@@ -4,6 +4,12 @@
 
 **Sentinels of Truth** is a multi-agent AI system that autonomously investigates real-world claims against live web evidence and reconciles the verdicts against a persistent ground-truth database. Two specialized LangGraph agents — an investigative **Scout** and a database-gatekeeping **Librarian** — collaborate in a directed pipeline to verify, debunk, and flag conflicting information in real time.
 
+<p align="center">
+  <a href="https://sentinels-of-truth-aman-basu.streamlit.app">
+    <img src="https://img.shields.io/badge/🔗_Live_Demo-Streamlit-FF4B4B?style=for-the-badge" alt="Live Demo"/>
+  </a>
+</p>
+
 ---
 
 ## 🧠 The Architecture (Multi-Agent System)
