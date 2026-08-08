@@ -1,13 +1,14 @@
 import streamlit as st
 import requests
+import os
 
-API_URL = "https://sentinels-backend.onrender.com/api/verify"
+API_URL = os.environ.get("API_URL", "https://sentinels-backend.onrender.com/api/verify")
 
 st.set_page_config(page_title="Sentinels of Truth", page_icon="🛡️", layout="centered")
 
 st.title("🛡️ Sentinels of Truth")
-st.markdown("### Fact-Checking & Knowledge Management System for Indian News Agencies")
-st.write("Submit an **Unverified Claim** below. Our multi-agent system will independently research the claim against live web data, cross-reference our **Ground Truth** database, and manage long-term memory based on strict consensus criteria.")
+st.markdown("### Multi-Agent Fact-Checking System")
+st.write("Submit a claim below. **The Scout** agent researches live web evidence, and **The Librarian** agent evaluates the findings before committing them to our persistent ground-truth store.")
 
 claim = st.text_input("Enter an unverified news claim to investigate:", placeholder="e.g., The ISRO Chandrayaan-4 mission launches next month.")
 
