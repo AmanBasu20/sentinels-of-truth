@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "http://127.0.0.1:8000/api/verify"
+API_URL = "https://sentinels-backend.onrender.com/api/verify"
 
 st.set_page_config(page_title="Sentinels of Truth", page_icon="🛡️", layout="centered")
 
