@@ -6,10 +6,10 @@ API_URL = "https://sentinels-backend.onrender.com/api/verify"
 st.set_page_config(page_title="Sentinels of Truth", page_icon="🛡️", layout="centered")
 
 st.title("🛡️ Sentinels of Truth")
-st.markdown("### AI-Powered Multi-Agent Fact-Checking System")
-st.write("Submit a claim below, and our autonomous agents (Alpha & Beta) will investigate the web and cross-reference our ground-truth database.")
+st.markdown("### Fact-Checking & Knowledge Management System for Indian News Agencies")
+st.write("Submit an **Unverified Claim** below. Our multi-agent system will independently research the claim against live web data, cross-reference our **Ground Truth** database, and manage long-term memory based on strict consensus criteria.")
 
-claim = st.text_input("Enter a breaking news claim to verify:", placeholder="e.g., The ISRO Chandrayaan-4 mission launches next month.")
+claim = st.text_input("Enter an unverified news claim to investigate:", placeholder="e.g., The ISRO Chandrayaan-4 mission launches next month.")
 
 if st.button("Verify Claim"):
     if not claim.strip():

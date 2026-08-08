@@ -1,126 +1,95 @@
 # 🛡️ Sentinels of Truth
 
-### Fact-Checking & Knowledge Management System for an Indian news agency
-
-**Sentinels of Truth** is a production-grade multi-agent AI system designed to help newsrooms autonomously investigate breaking news, combat regional misinformation, and maintain a persistent ground-truth database. Two specialized LangGraph agents — an investigative **Scout** and a database-gatekeeping **Librarian** — collaborate in a directed pipeline to verify, debunk, and flag conflicting information in real time.
+A multi-agent fact-checking and knowledge-base system: ingest an unverified claim, have one agent research it against live web evidence, and have a second agent decide whether that finding actually belongs in a persistent "ground truth" store.
 
 <p align="center">
   <a href="https://sentinels-of-truth-aman-basu.streamlit.app">
-    <img src="https://img.shields.io/badge/🔗_Live_Demo-Streamlit-FF4B4B?style=for-the-badge" alt="Live Demo"/>
+    <img src="https://img.shields.io/badge/Live_Demo-Streamlit-FF4B4B?style=for-the-badge" alt="Live Demo"/>
   </a>
 </p>
 
----
-
-## 🧠 The Architecture (Multi-Agent System)
-
 <p align="center">
-  <img src="./assets/workflow_graph.png" alt="LangGraph agent workflow: Start → Scout → Librarian → End" width="220"/>
+  <img src="./assets/workflow_graph.png" alt="LangGraph agent workflow: Start → Scout → Librarian → End" width="108"/>
 </p>
 
-The system is orchestrated as a directed graph of two cooperating agents, each with a narrow, well-defined responsibility — a design that keeps reasoning (Alpha) cleanly separated from state mutation (Beta).
+Claims come in through a single on-demand endpoint — you submit one, the pipeline runs, you get a verdict back. There's no background feed poller here; it's a direct submit-and-verify loop, which is enough to exercise the full agent pipeline end to end.
 
-### 🔎 Agent Alpha — *"The Scout"*
-The investigative front-line agent. Alpha receives a raw claim, performs a **Tavily web search** to gather current evidence, and passes that evidence to a **Groq-hosted Llama 3.1 8B** model constrained with `.with_structured_output()`. This forces the LLM to return a strict Pydantic-validated `VerificationReport` — containing a verdict (`VERIFIED` / `FALSE` / `UNVERIFIED`), a confidence score, a plain-English summary, and a normalized `subject` field used downstream for database matching.
+## Architecture
 
-### 📚 Agent Beta — *"The Librarian"*
-The gatekeeper. Beta takes Alpha's report and reconciles it against the SQLite `claims` table using a deterministic conflict-resolution policy:
+Two agents, each with a narrow job and its own toolset, wired together as a LangGraph state machine: `START → Scout → Librarian → END`.
+
+### Agent Alpha — "The Scout"
+Takes the raw claim, runs a Tavily web search for supporting/contradicting evidence, and hands both to a Groq-hosted Llama 3.1 8B model constrained with `.with_structured_output()`. The output is a Pydantic-validated `VerificationReport`: a verdict (`VERIFIED` / `FALSE` / `UNVERIFIED`), a confidence score, a summary, and a normalized `subject` string used later for deduplication. Alpha never touches the database — its only responsibility is producing a report.
+
+The claim-triage reasoning (deciding what's missing / what needs checking) happens implicitly inside that structured-output call rather than as a separate explicit step — the model is prompted to weigh the search evidence and land on `UNVERIFIED` when it can't resolve the claim, rather than Alpha first enumerating missing information before searching. Worth knowing going in if you're looking for a distinct "what am I missing" phase.
+
+### Agent Beta — "The Librarian"
+The only component with database write access. It takes Alpha's report and queries the `claims` table by `subject` before doing anything:
 
 | Scenario | Action |
 |---|---|
-| Claim is `UNVERIFIED` | **Discard early** — never touches the database |
-| No existing record for the subject | **Insert** (`VERIFIED` or `FALSE`) |
-| Existing record agrees, or is already `FLAGGED` | **Discard (Redundant)** |
-| Existing record contradicts the new verdict | **Flag (Pending Review)** — appends a timestamped conflict note and merges source lists |
-| Concurrent insert collides on the unique `subject` constraint | **Discard (Concurrent Duplicate)** — caught via `sqlite3.IntegrityError` |
+| Claim is `UNVERIFIED` | Discard immediately — database is never touched |
+| No existing record for the subject | Insert (`VERIFIED` or `FALSE`) |
+| Existing record already agrees, or is `FLAGGED` | Discard (redundant) |
+| Existing record contradicts the new verdict | Flag for review — appends a timestamped conflict note, merges source lists |
+| Two requests insert the same new subject concurrently | Caught via `sqlite3.IntegrityError` on the unique constraint, second one discarded |
 
-### 🕸️ The Orchestrator
-**LangGraph** wires Alpha and Beta together through a shared `AgentState` TypedDict — the system's "scorecard." State fields like `claim`, `subject`, `report`, and `beta_action` flow through the graph, while `trace` uses an `operator.add`-annotated reducer so every node appends to a running audit log instead of overwriting it. The graph itself is a simple, explicit pipeline: `START → Scout → Librarian → END`.
+### The Orchestrator
+LangGraph passes a shared `AgentState` TypedDict between the two nodes. `trace` uses an `operator.add` reducer, so each agent appends to a running log instead of overwriting it — that log is what the frontend shows as the investigation history.
 
----
+## Tech Stack
 
-## ⚙️ Tech Stack
+- **FastAPI** — REST layer exposing `POST /api/verify`
+- **Streamlit** — claim submission UI + verdict/trace display
+- **LangGraph** — orchestration, manually-defined state schema
+- **Groq + Llama 3.1 8B Instant** — structured-output inference for Alpha
+- **Tavily** — web search evidence
+- **SQLite** — ground-truth store
+- **Pydantic** — schema validation for both the LLM output and the API contract
 
-- **FastAPI** — REST API layer exposing the verification endpoint
-- **Streamlit** — interactive frontend for submitting claims and viewing verdicts
-- **LangGraph** — stateful multi-agent orchestration
-- **Groq + Llama 3.1 8B (Instant)** — low-latency structured-output inference for Agent Alpha
-- **Tavily Search API** — real-time web evidence retrieval
-- **SQLite** — lightweight persistent ground-truth store
-- **Pydantic** — schema validation for both LLM output and API contracts
-- **python-dotenv** — environment/API key management
+## Local Setup
 
----
-
-## 🚀 Local Setup & Installation
-
-**1. Clone the repository**
 ```bash
 git clone https://github.com/<your-username>/sentinels-of-truth.git
 cd sentinels-of-truth
-```
-
-**2. Create and activate a virtual environment**
-```bash
-# Create the venv
 python -m venv venv
-
-# Activate it
-# macOS / Linux
-source venv/bin/activate
-# Windows
-venv\Scripts\activate
-```
-
-**3. Install dependencies**
-```bash
+source venv/bin/activate   # venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
-**4. Configure environment variables**
-
-Create a `.env` file in the project root with your API keys:
+Create a `.env` file:
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 TAVILY_API_KEY=your_tavily_api_key_here
 ```
 
-**5. Run the system — two terminals required**
+Run it as two processes:
 
-This is a two-process system: the FastAPI backend and the Streamlit frontend run independently and communicate over HTTP.
+```bash
+# terminal 1 — backend, also initializes ground_truth.db on first run
+uvicorn main:api --reload
 
-> **Terminal 1 — Start the backend API**
-> ```bash
-> uvicorn main:api --reload
-> ```
-> This also initializes `ground_truth.db` on first run.
+# terminal 2 — frontend
+streamlit run frontend.py
+```
 
-> **Terminal 2 — Start the frontend**
-> ```bash
-> streamlit run frontend.py
-> ```
+Open the Streamlit URL (usually `http://localhost:8501`) and submit a claim.
 
-Once both are running, open the Streamlit URL (typically `http://localhost:8501`) and submit a claim to watch the Scout and Librarian go to work. 🕵️‍♂️📖
+## Known limitations
 
----
+The real architectural tension here: a probabilistic layer (Alpha's LLM-generated `subject` field) writing into a deterministic layer (Beta's exact-match `WHERE subject = ?` against a SQL unique constraint). Because LLM generation isn't deterministic across calls, the same underlying fact can get normalized to different strings on different runs. Concretely: "Jupiter is the largest planet" can produce the subject `"largest planet"`, while "Saturn is the largest planet in our solar system" produces `"largest planet in our solar system"` — same fact-space to a human, two unrelated rows to SQLite. That silently breaks the conflict-detection logic Beta depends on. It's not a prompting bug, it's a ceiling on what exact-match relational lookups can do with generated text.
 
-## 🔬 System Limitations & Future Architecture
+The fix is replacing (or augmenting) the SQLite lookup with a vector store — ChromaDB, say — embedding each `subject` and retrieving near-duplicates by cosine similarity above a threshold, instead of string equality. That would let Beta correctly cluster `"largest planet"` and `"largest planet in our solar system"` as the same subject, while SQLite (or a hybrid store) still handles the structured fields — status, confidence, timestamps, sources.
 
-The current implementation exposes a fundamental architectural tension: **a probabilistic reasoning layer writing into a deterministic storage layer.** Agent Alpha's `subject` field is generated by an LLM to normalize a claim's topic for deduplication — but Agent Beta resolves conflicts via an exact-match SQL `WHERE subject = ?` query against a `UNIQUE` constraint. Since LLM generation is non-deterministic across calls, semantically identical topics can be phrased differently between runs. A concrete edge case surfaced during testing: the claim *"Jupiter is the largest planet"* can yield the subject `"largest planet"`, while a related claim like *"Saturn is the largest planet in our solar system"* yields `"largest planet in our solar system"`. These are the same underlying fact-space to a human, but to SQLite's string comparison they are two unrelated rows — silently defeating the conflict-detection logic the Librarian depends on. This is a structural ceiling of exact-match relational lookups for anything derived from generative text, not a bug fixable with better prompting alone.
-
-The next architectural evolution addresses this by replacing (or augmenting) the SQLite exact-match lookup with a **vector database** — such as **ChromaDB** — that embeds each `subject` string and retrieves near-duplicate claims via **cosine similarity** against a tunable threshold, rather than string equality. This would let the Librarian correctly cluster `"largest planet"` and `"largest planet in our solar system"` as the same semantic subject, enabling true fuzzy conflict detection while preserving SQLite (or a hybrid store) for the structured, auditable fields — status, confidence, timestamps, and source provenance.
-
----
-
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 sentinels-of-truth/
-├── main.py              # FastAPI app — exposes POST /api/verify, invokes the LangGraph orchestrator
-├── orchestrator.py       # LangGraph StateGraph — wires Scout → Librarian → END, compiles the app
-├── alpha_agent.py         # Agent Alpha ("The Scout") — Tavily web search + Groq structured-output verification
-├── beta_agent.py           # Agent Beta ("The Librarian") — SQL conflict resolution (Insert / Flag / Discard)
-├── database.py               # SQLite schema definition and DB initialization (claims table)
-├── frontend.py                 # Streamlit UI — submits claims to the API and renders verdicts + trace history
-└── requirements.txt              # Python dependencies
+├── main.py             # FastAPI app — POST /api/verify, invokes the LangGraph orchestrator
+├── orchestrator.py     # LangGraph StateGraph — Scout → Librarian → END
+├── alpha_agent.py       # Agent Alpha — Tavily search + Groq structured-output verification
+├── beta_agent.py        # Agent Beta — SQL conflict resolution (Insert / Flag / Discard)
+├── database.py          # SQLite schema + init
+├── frontend.py           # Streamlit UI
+└── requirements.txt
 ```
