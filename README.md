@@ -1,8 +1,8 @@
 # 🛡️ Sentinels of Truth
 
-### Automated AI Fact-Checking & Knowledge Management
+### Fact-Checking & Knowledge Management System for an Indian news agency
 
-**Sentinels of Truth** is a multi-agent AI system that autonomously investigates real-world claims against live web evidence and reconciles the verdicts against a persistent ground-truth database. Two specialized LangGraph agents — an investigative **Scout** and a database-gatekeeping **Librarian** — collaborate in a directed pipeline to verify, debunk, and flag conflicting information in real time.
+**Sentinels of Truth** is a production-grade multi-agent AI system designed to help newsrooms autonomously investigate breaking news, combat regional misinformation, and maintain a persistent ground-truth database. Two specialized LangGraph agents — an investigative **Scout** and a database-gatekeeping **Librarian** — collaborate in a directed pipeline to verify, debunk, and flag conflicting information in real time.
 
 <p align="center">
   <a href="https://sentinels-of-truth-aman-basu.streamlit.app">

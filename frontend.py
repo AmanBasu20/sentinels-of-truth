@@ -9,7 +9,7 @@ st.title("🛡️ Sentinels of Truth")
 st.markdown("### AI-Powered Multi-Agent Fact-Checking System")
 st.write("Submit a claim below, and our autonomous agents (Alpha & Beta) will investigate the web and cross-reference our ground-truth database.")
 
-claim = st.text_area("Enter a claim to verify:", placeholder="e.g., The capital of Japan is Kyoto.")
+claim = st.text_input("Enter a breaking news claim to verify:", placeholder="e.g., The ISRO Chandrayaan-4 mission launches next month.")
 
 if st.button("Verify Claim"):
     if not claim.strip():
